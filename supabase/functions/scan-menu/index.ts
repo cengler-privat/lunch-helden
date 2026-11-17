@@ -1,13 +1,9 @@
 // ============================================================================
-// Supabase Edge Function: scan-menu
+// Supabase Edge Function: scan-menu (Zero-Dependency Version gegen Status 546)
 // Pfad: supabase/functions/scan-menu/index.ts
-// Beschreibung: Prüft die wirt_pin des gewählten Restaurants, analysiert das
-// hochgeladene Foto der Tages-/Wochenkarte mit @google/genai (inkl. Modell-Fallback)
-// und aktualisiert automatisch die Tabelle `dishes`.
+// Beschreibung: Nutzt reines fetch() für Supabase REST & Google Gemini API,
+// damit kein schweres npm-SDK das RAM-/CPU-Limit (HTTP 546) von Supabase sprengt.
 // ============================================================================
-
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { GoogleGenAI, Type } from "npm:@google/genai";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +17,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
 
@@ -42,16 +38,21 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const sbHeaders = {
+      "apikey": supabaseServiceRoleKey,
+      "Authorization": `Bearer ${supabaseServiceRoleKey}`,
+      "Content-Type": "application/json",
+    };
 
-    // 1. Restaurant & Wirt-PIN prüfen
-    const { data: restaurant, error: restError } = await supabase
-      .from("restaurants")
-      .select("id, name, wirt_pin")
-      .eq("id", restaurant_id)
-      .single();
+    // 1. Restaurant & Wirt-PIN über schlanke Supabase REST-API prüfen
+    const restLookup = await fetch(
+      `${supabaseUrl}/rest/v1/restaurants?id=eq.${encodeURIComponent(String(restaurant_id))}&select=id,name,wirt_pin`,
+      { headers: sbHeaders }
+    );
+    const restRows = await restLookup.json();
+    const restaurant = Array.isArray(restRows) ? restRows[0] : null;
 
-    if (restError || !restaurant) {
+    if (!restaurant) {
       return new Response(
         JSON.stringify({ error: "Restaurant wurde nicht gefunden." }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -65,32 +66,27 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 2. Foto per @google/genai (inkl. Modell-Fallback bei 503-Spikes) auslesen
-    const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-    const prompt = `
-      Lies alle Tagesgerichte oder Mittagsangebote von diesem Foto einer Speisekarte/Tafel aus.
-      Extrahiere ausschließlich sachliche Fakten (Name des Gerichts, Wochentag falls angegeben sonst "Heute", Preis in Euro als Zahl, und ob das Gericht vegetarisch ist).
-    `;
+    // 2. Foto direkt per schlankem Gemini REST-Call analysieren (verhindert Status 546)
+    const prompt =
+      "Lies alle Tagesgerichte oder Mittagsangebote von diesem Foto einer Speisekarte/Tafel aus. " +
+      "Extrahiere ausschließlich sachliche Fakten als JSON-Array von Objekten mit den Feldern: " +
+      'day (Wochentag oder "Heute"), title (Name des Gerichts), price (Preis in Euro als Dezimalzahl), is_vegetarian (true/false).';
 
-    const modelsToTry = [
-      Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash",
-      "gemini-3.5-flash",
-      "gemini-3.5-flash-lite",
-      "gemini-3.8-flash",
-    ];
-
+    const modelsToTry = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"];
     let extractedDishes: Array<{
       day?: string;
       title: string;
       price: number;
       is_vegetarian?: boolean;
     }> = [];
-    let lastError: unknown = null;
+    let lastError = "Keine Antwort von Gemini";
 
     for (const modelName of modelsToTry) {
-      try {
-        const aiResponse = await ai.models.generateContent({
-          model: modelName,
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(geminiApiKey)}`;
+      const geminiResp = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           contents: [
             {
               role: "user",
@@ -105,50 +101,49 @@ Deno.serve(async (req: Request) => {
               ],
             },
           ],
-          config: {
+          generationConfig: {
             responseMimeType: "application/json",
             responseSchema: {
-              type: Type.ARRAY,
+              type: "ARRAY",
               items: {
-                type: Type.OBJECT,
+                type: "OBJECT",
                 properties: {
-                  day: { type: Type.STRING, description: "Wochentag oder 'Heute'" },
-                  title: { type: Type.STRING, description: "Name des Tagesgerichts" },
-                  price: { type: Type.NUMBER, description: "Preis in Euro als Dezimalzahl" },
-                  is_vegetarian: { type: Type.BOOLEAN, description: "True wenn vegetarisch" },
+                  day: { type: "STRING" },
+                  title: { type: "STRING" },
+                  price: { type: "NUMBER" },
+                  is_vegetarian: { type: "BOOLEAN" },
                 },
                 required: ["day", "title", "price", "is_vegetarian"],
               },
             },
           },
-        });
-        extractedDishes = JSON.parse(aiResponse.text || "[]");
-        break;
-      } catch (err) {
-        lastError = err;
-      }
-    }
+        }),
+      });
 
-    if (extractedDishes.length === 0 && lastError) {
-      throw lastError;
+      if (geminiResp.ok) {
+        const geminiData = await geminiResp.json();
+        const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+        extractedDishes = JSON.parse(rawText);
+        break;
+      } else {
+        lastError = await geminiResp.text();
+      }
     }
 
     if (!Array.isArray(extractedDishes) || extractedDishes.length === 0) {
       return new Response(
-        JSON.stringify({ error: "Es konnten keine Gerichte auf dem Foto erkannt werden." }),
+        JSON.stringify({ error: `Es konnten keine Gerichte erkannt werden (${lastError.slice(0, 160)}).` }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 3. Alte Gerichte des Restaurants ersetzen & neue Gerichte speichern
-    await supabase.from("dishes").delete().eq("restaurant_id", restaurant_id);
+    // 3. Alte Gerichte löschen & neue Gerichte per Supabase REST speichern
+    await fetch(
+      `${supabaseUrl}/rest/v1/dishes?restaurant_id=eq.${encodeURIComponent(String(restaurant_id))}`,
+      { method: "DELETE", headers: sbHeaders }
+    );
 
-    const rowsToInsert = extractedDishes.map((d: {
-      day?: string;
-      title: string;
-      price: number;
-      is_vegetarian?: boolean;
-    }) => ({
+    const rowsToInsert = extractedDishes.map((d) => ({
       restaurant_id: Number(restaurant_id),
       day: d.day || "Heute",
       title: String(d.title).trim(),
@@ -157,14 +152,18 @@ Deno.serve(async (req: Request) => {
       updated_at: new Date().toISOString(),
     }));
 
-    const { data: insertedDishes, error: insertError } = await supabase
-      .from("dishes")
-      .insert(rowsToInsert)
-      .select();
+    const insertResp = await fetch(`${supabaseUrl}/rest/v1/dishes`, {
+      method: "POST",
+      headers: { ...sbHeaders, "Prefer": "return=representation" },
+      body: JSON.stringify(rowsToInsert),
+    });
 
-    if (insertError) {
-      throw insertError;
+    if (!insertResp.ok) {
+      const errText = await insertResp.text();
+      throw new Error(`Supabase Insert Fehler: ${errText}`);
     }
+
+    const insertedDishes = await insertResp.json();
 
     return new Response(
       JSON.stringify({

@@ -1181,13 +1181,45 @@
       }
     }
 
+    // Komprimiert und skaliert Smartphone-Fotos vor dem Upload auf max. 1400px,
+    // damit die Supabase Edge Function blitzschnell bleibt und nicht in Status 546 (RAM-Limit) läuft.
     function fileToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-          const result = String(reader.result || '');
-          const base64 = result.includes(',') ? result.split(',')[1] : result;
-          resolve({ base64, mimeType: file.type || 'image/jpeg' });
+          const dataUrl = String(reader.result || '');
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const maxDim = 1400;
+              let { width, height } = img;
+              if (width > maxDim || height > maxDim) {
+                if (width >= height) {
+                  height = Math.round((height * maxDim) / width);
+                  width = maxDim;
+                } else {
+                  width = Math.round((width * maxDim) / height);
+                  height = maxDim;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+              const compressedUrl = canvas.toDataURL('image/jpeg', 0.82);
+              const base64 = compressedUrl.split(',')[1];
+              resolve({ base64, mimeType: 'image/jpeg' });
+            } catch {
+              const fallbackBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+              resolve({ base64: fallbackBase64, mimeType: file.type || 'image/jpeg' });
+            }
+          };
+          img.onerror = () => {
+            const fallbackBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+            resolve({ base64: fallbackBase64, mimeType: file.type || 'image/jpeg' });
+          };
+          img.src = dataUrl;
         };
         reader.onerror = reject;
         reader.readAsDataURL(file);
