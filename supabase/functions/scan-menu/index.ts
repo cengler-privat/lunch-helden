@@ -74,7 +74,7 @@ serve(async (req: Request) => {
     `;
 
     const aiResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash",
       contents: [
         {
           role: "user",

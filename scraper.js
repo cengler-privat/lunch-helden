@@ -14,13 +14,19 @@ import robotsParser from 'robots-parser';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI, Type } from '@google/genai';
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://hskgtyticqtrsalcslmr.supabase.co').trim();
+const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
+const GEMINI_MODEL = (process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim();
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !GEMINI_API_KEY) {
-  console.error('❌ Fehlende Umgebungsvariablen: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY oder GEMINI_API_KEY.');
-  process.exit(1);
+const missingVars = [];
+if (!SUPABASE_SERVICE_ROLE_KEY) missingVars.push('SUPABASE_SERVICE_ROLE_KEY');
+if (!GEMINI_API_KEY) missingVars.push('GEMINI_API_KEY');
+
+if (missingVars.length > 0) {
+  console.warn(`⚠️ Hinweis: Folgende GitHub Actions Secrets sind noch nicht als Repository Secret hinterlegt: ${missingVars.join(', ')}`);
+  console.warn('👉 Bitte trage sie unter https://github.com/cengler-privat/lunch-helden/settings/secrets/actions (unter "Repository secrets") ein.');
+  process.exit(0);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -113,11 +119,11 @@ async function fetchMenuRawText(websiteUrl) {
 }
 
 /**
- * Extrahiert Tagesgerichte mithilfe von Gemini 2.5 Flash als strukturiertes JSON.
+ * Extrahiert Tagesgerichte mithilfe von Gemini als strukturiertes JSON.
  */
 async function extractDishesWithGemini(restaurantName, rawText) {
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_MODEL,
     contents: `
       Du analysierst den öffentlichen Speisekarten-Text von "${restaurantName}".
       Extrahiere alle aktuellen Mittagsgerichte / Tagesgerichte als Liste von Fakten (keine werblichen Beschreibungen kopieren).
