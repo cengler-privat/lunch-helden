@@ -2,11 +2,10 @@
 // Supabase Edge Function: scan-menu
 // Pfad: supabase/functions/scan-menu/index.ts
 // Beschreibung: Prüft die wirt_pin des gewählten Restaurants, analysiert das
-// hochgeladene Foto der Tages-/Wochenkarte mit @google/genai (gemini-2.5-flash)
+// hochgeladene Foto der Tages-/Wochenkarte mit @google/genai (inkl. Modell-Fallback)
 // und aktualisiert automatisch die Tabelle `dishes`.
 // ============================================================================
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { GoogleGenAI, Type } from "npm:@google/genai";
 
@@ -16,7 +15,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -66,48 +65,73 @@ serve(async (req: Request) => {
       );
     }
 
-    // 2. Foto per @google/genai (gemini-2.5-flash) auslesen
+    // 2. Foto per @google/genai (inkl. Modell-Fallback bei 503-Spikes) auslesen
     const ai = new GoogleGenAI({ apiKey: geminiApiKey });
     const prompt = `
       Lies alle Tagesgerichte oder Mittagsangebote von diesem Foto einer Speisekarte/Tafel aus.
       Extrahiere ausschließlich sachliche Fakten (Name des Gerichts, Wochentag falls angegeben sonst "Heute", Preis in Euro als Zahl, und ob das Gericht vegetarisch ist).
     `;
 
-    const aiResponse = await ai.models.generateContent({
-      model: Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: prompt },
+    const modelsToTry = [
+      Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash-lite",
+      "gemini-3.8-flash",
+    ];
+
+    let extractedDishes: Array<{
+      day?: string;
+      title: string;
+      price: number;
+      is_vegetarian?: boolean;
+    }> = [];
+    let lastError: unknown = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const aiResponse = await ai.models.generateContent({
+          model: modelName,
+          contents: [
             {
-              inlineData: {
-                mimeType: mime_type || "image/jpeg",
-                data: image_base64,
-              },
+              role: "user",
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    mimeType: mime_type || "image/jpeg",
+                    data: image_base64,
+                  },
+                },
+              ],
             },
           ],
-        },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              day: { type: Type.STRING, description: "Wochentag oder 'Heute'" },
-              title: { type: Type.STRING, description: "Name des Tagesgerichts" },
-              price: { type: Type.NUMBER, description: "Preis in Euro als Dezimalzahl" },
-              is_vegetarian: { type: Type.BOOLEAN, description: "True wenn vegetarisch" },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  day: { type: Type.STRING, description: "Wochentag oder 'Heute'" },
+                  title: { type: Type.STRING, description: "Name des Tagesgerichts" },
+                  price: { type: Type.NUMBER, description: "Preis in Euro als Dezimalzahl" },
+                  is_vegetarian: { type: Type.BOOLEAN, description: "True wenn vegetarisch" },
+                },
+                required: ["day", "title", "price", "is_vegetarian"],
+              },
             },
-            required: ["day", "title", "price", "is_vegetarian"],
           },
-        },
-      },
-    });
+        });
+        extractedDishes = JSON.parse(aiResponse.text || "[]");
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
 
-    const extractedDishes = JSON.parse(aiResponse.text || "[]");
+    if (extractedDishes.length === 0 && lastError) {
+      throw lastError;
+    }
 
     if (!Array.isArray(extractedDishes) || extractedDishes.length === 0) {
       return new Response(
