@@ -12,20 +12,16 @@
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link rel="apple-touch-icon" href="./icon.svg" />
 
-  <!-- Google Fonts für Moderne UI + Bistro-Serifenschrift -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
-
-  <!-- Tailwind CSS via CDN -->
+  <!-- DSGVO-konform: Keine Verbindung zu fonts.googleapis.com / fonts.gstatic.com!
+       Wir nutzen hochwertige lokale System-Schriften für Sans & Bistro-Serif. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
-            serif: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+            serif: ['Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
           },
           colors: {
             brand: {
@@ -47,10 +43,6 @@
       }
     };
   </script>
-
-  <!-- Leaflet CSS & JS für Radar-Karte -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <!-- Supabase JS Client via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -233,7 +225,7 @@
     <!-- ANSICHT 2: BISTRO-ZETTEL (Klemmbrett / Klassische Serifenschrift) -->
     <section id="viewBistro" class="hidden grid grid-cols-1 md:grid-cols-2 gap-8 pt-4" aria-label="Bistro-Zettel-Ansicht"></section>
 
-    <!-- ANSICHT 3: RADAR-KARTE (Interaktive OpenStreetMap / Leaflet) -->
+    <!-- ANSICHT 3: RADAR-KARTE (Interaktive OpenStreetMap / Leaflet mit 2-Klick-DSGVO-Schutz) -->
     <section id="viewMap" class="hidden" aria-label="Radar-Karten-Ansicht">
       <div class="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
         <div class="px-4 py-3 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center justify-between gap-2">
@@ -243,6 +235,26 @@
           </div>
           <span class="text-xs text-stone-500">Umkreis: Walldorf • Wiesloch • St. Leon-Rot</span>
         </div>
+
+        <!-- 2-Klick-Lösung für OpenStreetMap (wird angezeigt, solange externe Karten nicht freigegeben wurden) -->
+        <div id="mapConsentOverlay" class="hidden p-8 sm:p-12 text-center bg-stone-100/80 min-h-[420px] flex flex-col items-center justify-center">
+          <div class="w-14 h-14 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center text-2xl mb-4 shadow-xs">
+            🗺️
+          </div>
+          <h3 class="text-lg font-extrabold text-stone-900 mb-2">Externe Karte aktivieren (OpenStreetMap)</h3>
+          <p class="text-xs sm:text-sm text-stone-600 max-w-lg mb-6 leading-relaxed">
+            Zum Schutz deiner Privatsphäre (DSGVO) werden Kartenkacheln von <strong>OpenStreetMap</strong> erst nach deiner Zustimmung geladen. Durch das Aktivieren wird deine IP-Adresse an Server der OpenStreetMap Foundation übertragen.
+          </p>
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <button id="enableMapConsentBtn" type="button" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-bold shadow-sm transition">
+              Karte aktivieren &amp; merken
+            </button>
+            <button type="button" data-legal="datenschutz" class="legal-modal-btn px-4 py-2.5 rounded-xl bg-white border border-stone-300 text-stone-700 text-xs sm:text-sm font-semibold hover:bg-stone-50 transition">
+              Mehr im Datenschutz
+            </button>
+          </div>
+        </div>
+
         <div id="radarMapContainer" class="w-full h-[540px] z-10"></div>
       </div>
     </section>
@@ -277,22 +289,53 @@
     </section>
   </main>
 
-  <!-- FOOTER MIT IMPRESSUM & DATENSCHUTZ -->
+  <!-- RECHTSSICHERER FOOTER MIT IMPRESSUM, DATENSCHUTZ & COOKIE-EINSTELLUNGEN -->
   <footer class="bg-white border-t border-stone-200 mt-12">
     <div class="max-w-6xl mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-500">
       <div>
         <p class="font-bold text-stone-800 text-sm">Lunch-Helden — Dein regionaler Mittagstisch</p>
-        <p>Startregion: 69190 Walldorf • 69168 Wiesloch • 68789 St. Leon-Rot (modular erweiterbar)</p>
+        <p>Startregion: 69190 Walldorf • 69168 Wiesloch • 68789 St. Leon-Rot</p>
+        <p class="text-[11px] text-stone-400 mt-1">
+          Alle Preis- und Gerichtsangaben ohne Gewähr. Änderungen durch die Gastronomiebetriebe vorbehalten.
+        </p>
       </div>
-      <div class="flex flex-wrap items-center gap-4 font-medium">
+      <div class="flex flex-wrap items-center gap-3 sm:gap-4 font-semibold text-stone-600">
         <button type="button" id="openWirtModalBtnFooter" class="hover:text-brand-600 transition">Wirt-Login (PIN)</button>
-        <span>•</span>
-        <button type="button" data-legal="impressum" class="legal-modal-btn hover:text-stone-900 transition">Impressum</button>
-        <span>•</span>
-        <button type="button" data-legal="datenschutz" class="legal-modal-btn hover:text-stone-900 transition">Datenschutz</button>
+        <span class="text-stone-300">•</span>
+        <button type="button" data-legal="impressum" class="legal-modal-btn hover:text-brand-600 transition">Impressum</button>
+        <span class="text-stone-300">•</span>
+        <button type="button" data-legal="datenschutz" class="legal-modal-btn hover:text-brand-600 transition">Datenschutzerklärung</button>
+        <span class="text-stone-300">•</span>
+        <button type="button" id="openCookieSettingsBtn" class="hover:text-brand-600 transition">Datenschutz-Einstellungen</button>
       </div>
     </div>
   </footer>
+
+  <!-- COOKIE- & DATENSCHUTZ-BANNER (DSGVO / TDDDG) -->
+  <div id="cookieConsentBanner" class="fixed bottom-0 inset-x-0 z-40 hidden p-4">
+    <div class="max-w-4xl mx-auto bg-stone-900 text-stone-100 rounded-2xl border border-stone-700 shadow-2xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+      <div class="space-y-1.5 text-xs leading-relaxed text-stone-300">
+        <p class="text-sm font-extrabold text-white flex items-center gap-2">
+          <span>🛡️</span>
+          <span>Datenschutz &amp; Cookie-Hinweise</span>
+        </p>
+        <p>
+          Wir setzen auf <strong>Lunch-Helden</strong> keine Werbe- oder Tracking-Cookies ein. Technisch notwendig ist lediglich die lokale Speicherung deiner Auswahl im Browser (<code>localStorage</code>) sowie der Abruf der Speisekarten-Datenbank. Wenn du „Alle akzeptieren“ wählst, erlaubst du zusätzlich das Laden der interaktiven Straßenkarte von <strong>OpenStreetMap</strong>.
+        </p>
+        <p class="text-[11px] text-stone-400 pt-0.5">
+          Details findest du in unserer <button type="button" data-legal="datenschutz" class="legal-modal-btn underline hover:text-white">Datenschutzerklärung</button> und im <button type="button" data-legal="impressum" class="legal-modal-btn underline hover:text-white">Impressum</button>.
+        </p>
+      </div>
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full md:w-auto flex-shrink-0">
+        <button id="consentEssentialOnlyBtn" type="button" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-600 text-xs font-bold transition whitespace-nowrap">
+          Nur technisch notwendige
+        </button>
+        <button id="consentAcceptAllBtn" type="button" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md transition whitespace-nowrap">
+          Alle akzeptieren (inkl. Karte)
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL: FÜR GASTRONOMEN (KI-FOTO-SCANNER) -->
   <div id="wirtModal" class="fixed inset-0 z-50 hidden bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="wirtModalTitle">
@@ -339,24 +382,30 @@
     </div>
   </div>
 
-  <!-- MODAL: IMPRESSUM & DATENSCHUTZ (PLATZHALTER) -->
+  <!-- MODAL: VOLLSTÄNDIGES IMPRESSUM & DATENSCHUTZERKLÄRUNG -->
   <div id="legalModal" class="fixed inset-0 z-50 hidden bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="legalModalTitle">
-    <div class="bg-white rounded-2xl max-w-lg w-full border border-stone-200 shadow-2xl overflow-hidden">
-      <div class="bg-stone-900 text-white px-6 py-4 flex items-center justify-between">
-        <h3 id="legalModalTitle" class="font-bold text-base">Rechtliche Hinweise</h3>
-        <button id="closeLegalModalBtn" type="button" class="text-stone-400 hover:text-white text-xl leading-none font-bold" aria-label="Schließen">&times;</button>
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col border border-stone-200 shadow-2xl overflow-hidden">
+      <div class="bg-stone-900 text-white px-6 py-4 flex items-center justify-between flex-shrink-0">
+        <h3 id="legalModalTitle" class="font-bold text-base sm:text-lg">Rechtliche Hinweise</h3>
+        <button id="closeLegalModalBtn" type="button" class="text-stone-400 hover:text-white text-2xl leading-none font-bold" aria-label="Schließen">&times;</button>
       </div>
-      <div id="legalModalContent" class="p-6 text-xs text-stone-600 space-y-3 leading-relaxed"></div>
+      <div id="legalModalContent" class="p-6 text-xs sm:text-sm text-stone-700 space-y-4 leading-relaxed overflow-y-auto"></div>
+      <div class="px-6 py-3 bg-stone-50 border-t border-stone-200 flex justify-end flex-shrink-0">
+        <button id="closeLegalModalFooterBtn" type="button" class="px-4 py-2 rounded-xl bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 transition">
+          Schließen
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- HAUPTSKRIPT (Vanilla JS, Supabase Live + Fallback) -->
+  <!-- HAUPTSKRIPT (Vanilla JS, Supabase Live + Fallback + DSGVO Consent) -->
   <script>
     // =========================================================================
     // 1. KONFIGURATION (Supabase Public URL & Publishable Anon Key)
     // =========================================================================
     const SUPABASE_URL = 'https://hskgtyticqtrsalcslmr.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_lo2m1iPIg7Dud_wdWY268Q_z-YxpJNx';
+    const CONSENT_STORAGE_KEY = 'lunch_helden_privacy_consent_v1';
 
     // =========================================================================
     // 2. REALISTISCHE STARTDATEN (Fallback, falls DB noch leer oder offline)
@@ -517,7 +566,7 @@
     ];
 
     // =========================================================================
-    // 3. APP-STATE
+    // 3. APP-STATE & CONSENT-VERWALTUNG (DSGVO)
     // =========================================================================
     const state = {
       restaurants: [],
@@ -530,8 +579,53 @@
         veggie: false
       },
       mapInstance: null,
-      mapMarkersGroup: null
+      mapMarkersGroup: null,
+      leafletLoaded: false,
+      consent: null // null | 'essential' | 'all'
     };
+
+    function getStoredConsent() {
+      try {
+        return localStorage.getItem(CONSENT_STORAGE_KEY);
+      } catch {
+        return null;
+      }
+    }
+
+    function saveConsent(level) {
+      state.consent = level;
+      try {
+        localStorage.setItem(CONSENT_STORAGE_KEY, level);
+      } catch {
+        // Ignore storage errors in private browsing
+      }
+      document.getElementById('cookieConsentBanner').classList.add('hidden');
+      if (state.activeView === 'map') {
+        renderRadarMapView(getFilteredRestaurants());
+      }
+    }
+
+    // Dynamisches Nachladen von Leaflet erst nach aktiver Einwilligung (2-Klick-Schutz)
+    function ensureLeafletLoaded() {
+      if (state.leafletLoaded && typeof window.L !== 'undefined') {
+        return Promise.resolve();
+      }
+      return new Promise((resolve, reject) => {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(css);
+
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = () => {
+          state.leafletLoaded = true;
+          resolve();
+        };
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
 
     let supabaseClient = null;
     try {
@@ -816,15 +910,31 @@
         .join('');
     }
 
-    // --- ANSICHT 3: RADAR-KARTE (Leaflet) ---
-    function renderRadarMapView(restaurants) {
+    // --- ANSICHT 3: RADAR-KARTE (Leaflet mit 2-Klick-DSGVO-Einwilligung) ---
+    async function renderRadarMapView(restaurants) {
       if (state.activeView !== 'map') return;
 
+      const overlay = document.getElementById('mapConsentOverlay');
       const mapEl = document.getElementById('radarMapContainer');
-      if (!mapEl || typeof L === 'undefined') return;
+
+      // Prüfen, ob der Nutzer externen Karten (OpenStreetMap) zugestimmt hat
+      if (state.consent !== 'all') {
+        overlay.classList.remove('hidden');
+        mapEl.classList.add('hidden');
+        return;
+      }
+
+      overlay.classList.add('hidden');
+      mapEl.classList.remove('hidden');
+
+      try {
+        await ensureLeafletLoaded();
+      } catch (err) {
+        console.error('Kartenbibliothek konnte nicht geladen werden:', err);
+        return;
+      }
 
       if (!state.mapInstance) {
-        // Zentrum zwischen Walldorf, Wiesloch und St. Leon-Rot
         state.mapInstance = L.map('radarMapContainer').setView([49.288, 8.648], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
@@ -865,7 +975,7 @@
           .join('');
 
         const popupHtml = `
-          <div style="min-width:220px;font-family:Inter,sans-serif;font-size:12px;line-height:1.4;">
+          <div style="min-width:220px;font-family:sans-serif;font-size:12px;line-height:1.4;">
             <div style="font-weight:800;font-size:14px;color:#1c1917;margin-bottom:2px;">${escapeHtml(r.name)}</div>
             <div style="color:#57534e;margin-bottom:6px;">${escapeHtml(r.address)}</div>
             <ul style="padding-left:14px;margin:6px 0 10px 0;">${popupDishes}</ul>
@@ -890,7 +1000,135 @@
     }
 
     // =========================================================================
-    // 7. INTERAKTIONEN: ANSICHTEN, FILTER & WIRT-MODUS
+    // 7. RECHTSTEXTE (IMPRESSUM NACH § 5 DDG & DATENSCHUTZERKLÄRUNG NACH DSGVO)
+    // =========================================================================
+    function openLegalModal(type) {
+      const titleEl = document.getElementById('legalModalTitle');
+      const contentEl = document.getElementById('legalModalContent');
+
+      if (type === 'impressum') {
+        titleEl.textContent = 'Impressum';
+        contentEl.innerHTML = `
+          <div class="space-y-4">
+            <div>
+              <h4 class="font-bold text-stone-900">Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz)</h4>
+              <p class="mt-1">
+                Christoph Engler<br />
+                Ahornweg 5<br />
+                69190 Walldorf<br />
+                Deutschland
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">Kontakt</h4>
+              <p class="mt-1">
+                Telefon: <a href="tel:+4962273097583" class="text-brand-600 underline">06227 3097583</a><br />
+                E-Mail: <a href="mailto:lunch-helden@englers.de" class="text-brand-600 underline">lunch-helden@englers.de</a>
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h4>
+              <p class="mt-1">
+                Christoph Engler<br />
+                Ahornweg 5<br />
+                69190 Walldorf
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">Hinweis zu Speisekarten, Preisen &amp; Öffnungszeiten</h4>
+              <p class="mt-1">
+                Dieses Angebot ist ein privates, nicht-kommerzielles Informationsprojekt für die Region Walldorf, Wiesloch und St. Leon-Rot. Alle dargestellten Speisekarten-Informationen (Gerichtsbezeichnungen, Preise, Öffnungszeiten) sind reine Tatsachenangaben, die von den öffentlich zugänglichen Webseiten der jeweiligen Gastronomiebetriebe stammen oder von den Gastronomen selbst bereitgestellt wurden. Für die Richtigkeit, Vollständigkeit und Aktualität der Angaben übernehmen wir keine Gewähr; maßgeblich sind stets die Angaben vor Ort im jeweiligen Betrieb.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">Haftung für Inhalte &amp; externe Links</h4>
+              <p class="mt-1">
+                Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Unser Angebot enthält Links zu externen Webseiten Dritter (insbesondere zu den Webseiten der dargestellten Gastronomiebetriebe sowie zu WhatsApp), auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">Verbraucherstreitbeilegung / Universalschlichtungsstelle</h4>
+              <p class="mt-1">
+                Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+              </p>
+            </div>
+          </div>
+        `;
+      } else {
+        titleEl.textContent = 'Datenschutzerklärung (DSGVO)';
+        contentEl.innerHTML = `
+          <div class="space-y-4">
+            <div>
+              <h4 class="font-bold text-stone-900">1. Verantwortlicher</h4>
+              <p class="mt-1">
+                Verantwortlicher im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:<br />
+                <strong>Christoph Engler</strong>, Ahornweg 5, 69190 Walldorf<br />
+                Telefon: 06227 3097583 · E-Mail: <a href="mailto:lunch-helden@englers.de" class="text-brand-600 underline">lunch-helden@englers.de</a>
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">2. Grundsatz: Kein Tracking, keine Werbe-Cookies</h4>
+              <p class="mt-1">
+                Wir setzen auf dieser Webseite <strong>keine Tracking-, Analyse- oder Marketing-Cookies</strong> (wie Google Analytics oder Meta Pixel) ein. Schriftarten werden lokal über dein Betriebssystem dargestellt; es findet kein Abruf von Google Fonts statt.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">3. Hosting über GitHub Pages</h4>
+              <p class="mt-1">
+                Diese Webseite wird bei <strong>GitHub Pages</strong> (GitHub Inc., 88 Colin P. Kelly Jr. St, San Francisco, CA 94107, USA / GitHub B.V., Niederlande) gehostet. Beim Aufruf der Webseite erfasst GitHub technisch notwendige Server-Logfiles (u. a. IP-Adresse, Zeitpunkt des Zugriffs, Browsertyp), um die sichere Auslieferung der Seite zu gewährleisten. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einem sicheren und stabilen Betrieb). Die Datenübermittlung in die USA stützt sich auf das EU-US Data Privacy Framework bzw. Standardvertragsklauseln der EU-Kommission.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">4. Datenbank-Abruf über Supabase</h4>
+              <p class="mt-1">
+                Um die aktuellen Tagesgerichte und Restaurant-Informationen anzuzeigen, lädt dein Browser diese öffentlichen Sachdaten aus unserer Datenbank bei <strong>Supabase</strong>. Dabei wird technisch bedingt deine IP-Adresse kurzzeitig zur Beantwortung der Datenbank-Anfrage verarbeitet. Es werden dabei keine personenbezogenen Nutzerprofile angelegt. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (Bereitstellung der angeforderten Webseiten-Funktion).
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">5. Lokale Speicherung deiner Datenschutz-Auswahl (TDDDG / localStorage)</h4>
+              <p class="mt-1">
+                Wir speichern deine Entscheidung im Datenschutz-Banner (<code>lunch_helden_privacy_consent_v1</code>) lokal im Speicher deines Browsers (<code>localStorage</code>), damit du nicht bei jedem Seitenaufruf erneut gefragt wirst. Dies ist technisch erforderlich gemäß § 25 Abs. 2 Nr. 2 TDDDG sowie Art. 6 Abs. 1 lit. c und f DSGVO.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">6. Interaktive Karte (OpenStreetMap – 2-Klick-Lösung)</h4>
+              <p class="mt-1">
+                In der Ansicht „Radar-Karte“ nutzen wir Kartenkacheln des Dienstes <strong>OpenStreetMap</strong> (OpenStreetMap Foundation, St John’s Innovation Centre, Cowley Road, Cambridge, CB4 0WS, Großbritannien). Die Karte ist standardmäßig blockiert und wird <strong>erst geladen, wenn du aktiv einwilligst</strong> („Alle akzeptieren“ oder „Karte aktivieren“). Erst nach deiner Einwilligung (Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG) wird deine IP-Adresse an Server von OpenStreetMap bzw. das CDN <code>unpkg.com</code> übertragen. Du kannst deine Einwilligung jederzeit unten im Footer über „Datenschutz-Einstellungen“ widerrufen.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">7. Teilen-Link für WhatsApp</h4>
+              <p class="mt-1">
+                Der Button „Per WhatsApp verabreden“ ist ein reiner externer Web-Link (<code>https://wa.me/...</code>). Solange du den Button nicht anklickst, findet keinerlei Datenübertragung an WhatsApp / Meta statt. Erst mit deinem aktiven Klick verlässt du unsere Seite und rufst WhatsApp auf.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-stone-900">8. Deine Rechte als betroffene Person</h4>
+              <p class="mt-1">
+                Du hast nach der DSGVO jederzeit das Recht auf unentgeltliche <strong>Auskunft</strong> (Art. 15 DSGVO), <strong>Berichtigung</strong> (Art. 16 DSGVO), <strong>Löschung</strong> (Art. 17 DSGVO), <strong>Einschränkung der Verarbeitung</strong> (Art. 18 DSGVO), <strong>Datenübertragbarkeit</strong> (Art. 20 DSGVO) sowie das Recht auf <strong>Widerspruch</strong> (Art. 21 DSGVO) und <strong>Widerruf erteilter Einwilligungen</strong> (Art. 7 Abs. 3 DSGVO). Zudem steht dir ein Beschwerderecht bei einer Datenschutz-Aufsichtsbehörde zu (z. B. beim Landesbeauftragten für den Datenschutz und die Informationsfreiheit Baden-Württemberg).
+              </p>
+            </div>
+          </div>
+        `;
+      }
+
+      document.getElementById('legalModal').classList.remove('hidden');
+    }
+
+    // =========================================================================
+    // 8. INTERAKTIONEN: ANSICHTEN, FILTER & WIRT-MODUS
     // =========================================================================
     function setActiveView(viewName) {
       state.activeView = viewName;
@@ -967,6 +1205,25 @@
         year: 'numeric'
       });
 
+      // Consent-Status beim Start prüfen
+      state.consent = getStoredConsent();
+      if (!state.consent) {
+        document.getElementById('cookieConsentBanner').classList.remove('hidden');
+      }
+
+      document.getElementById('consentEssentialOnlyBtn').addEventListener('click', () => {
+        saveConsent('essential');
+      });
+      document.getElementById('consentAcceptAllBtn').addEventListener('click', () => {
+        saveConsent('all');
+      });
+      document.getElementById('enableMapConsentBtn').addEventListener('click', () => {
+        saveConsent('all');
+      });
+      document.getElementById('openCookieSettingsBtn').addEventListener('click', () => {
+        document.getElementById('cookieConsentBanner').classList.remove('hidden');
+      });
+
       // Ansichts-Umschalter
       document.querySelectorAll('.view-switch-btn').forEach((btn) => {
         btn.addEventListener('click', () => setActiveView(btn.getAttribute('data-view')));
@@ -1038,7 +1295,7 @@
         if (!photoFile) return;
 
         feedback.className = 'rounded-xl p-3 text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200';
-        feedback.textContent = '⏳ Foto wird analysiert (Gemini 2.5 Flash) und Tageskarte aktualisiert…';
+        feedback.textContent = '⏳ Foto wird analysiert (Gemini Flash) und Tageskarte aktualisiert…';
         feedback.classList.remove('hidden');
         submitBtn.disabled = true;
 
@@ -1077,30 +1334,12 @@
       // Impressum & Datenschutz Modal
       document.querySelectorAll('.legal-modal-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const type = btn.getAttribute('data-legal');
-          const titleEl = document.getElementById('legalModalTitle');
-          const contentEl = document.getElementById('legalModalContent');
-          if (type === 'impressum') {
-            titleEl.textContent = 'Impressum (Platzhalter)';
-            contentEl.innerHTML = `
-              <p><strong>Angaben gemäß § 5 DDG:</strong></p>
-              <p>Lunch-Helden (Projekt-Prototyp)<br/>Region Walldorf / Wiesloch / St. Leon-Rot<br/>E-Mail: hallo@lunch-helden.de</p>
-              <p><strong>Quellenhinweis zu Speisekarten &amp; Preisen:</strong><br/>Alle angezeigten Fakten (Gerichtsbezeichnungen, Preise, Öffnungszeiten) stammen von den öffentlich zugänglichen Webseiten der jeweiligen Gastronomiebetriebe oder wurden durch die Gastronomen selbst per Foto-Upload bereitgestellt. Alle Angaben ohne Gewähr.</p>
-            `;
-          } else {
-            titleEl.textContent = 'Datenschutzerklärung (Platzhalter)';
-            contentEl.innerHTML = `
-              <p><strong>Datenschutz auf einen Blick:</strong></p>
-              <p>Lunch-Helden speichert keine personenbezogenen Tracking-Cookies. Für die Darstellung der interaktiven Karte werden Kartenkacheln von OpenStreetMap geladen. Die Datenbankabfrage der Tagesgerichte erfolgt über Supabase.</p>
-              <p>Beim Klick auf „Per WhatsApp verabreden“ wirst du erst nach deiner aktiven Bestätigung zu WhatsApp weitergeleitet.</p>
-            `;
-          }
-          document.getElementById('legalModal').classList.remove('hidden');
+          openLegalModal(btn.getAttribute('data-legal'));
         });
       });
-      document.getElementById('closeLegalModalBtn').addEventListener('click', () => {
-        document.getElementById('legalModal').classList.add('hidden');
-      });
+      const closeLegal = () => document.getElementById('legalModal').classList.add('hidden');
+      document.getElementById('closeLegalModalBtn').addEventListener('click', closeLegal);
+      document.getElementById('closeLegalModalFooterBtn').addEventListener('click', closeLegal);
 
       // Daten beim Start laden
       loadRestaurantsData();
