@@ -1,0 +1,19 @@
+{
+  "name": "Lunch-Helden – Mittagstisch Walldorf, Wiesloch & St. Leon-Rot",
+  "short_name": "Lunch-Helden",
+  "description": "Dein günstiger, ehrlicher Mittagstisch mit täglich wechselnden Tageskarten rund um Walldorf, Wiesloch und St. Leon-Rot.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#ea580c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

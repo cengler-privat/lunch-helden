@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lunch-Helden – Dein Mittagstisch rund um Walldorf, Wiesloch &amp; St. Leon-Rot</title>
+  <meta name="description" content="Günstiger, ehrlicher Mittagstisch mit täglich wechselnden Tageskarten im Umkreis von Walldorf, Wiesloch und St. Leon-Rot." />
+  <meta name="theme-color" content="#ea580c" />
+
+  <!-- PWA Manifest & Icons (ausschließlich relative Pfade für GitHub Pages & Hauptdomain) -->
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+
+  <!-- Google Fonts für Moderne UI + Bistro-Serifenschrift -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            serif: ['"Playfair Display"', 'Georgia', 'serif'],
+          },
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+              900: '#7c2d12',
+            },
+            paper: {
+              50: '#fdfbf7',
+              100: '#f7f2e7',
+              200: '#ece2cd',
+              800: '#3d352a',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Leaflet CSS & JS für Radar-Karte -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Supabase JS Client via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* Klemmbrett / Bistro-Zettel Textur & Details */
+    .bistro-paper {
+      background-color: #fdfbf7;
+      background-image: radial-gradient(#e5dec9 0.75px, transparent 0.75px);
+      background-size: 16px 16px;
+      box-shadow: 0 10px 25px -5px rgba(61, 53, 42, 0.12), 0 4px 10px -2px rgba(61, 53, 42, 0.08);
+    }
+    .bistro-clip {
+      width: 72px;
+      height: 18px;
+      background: linear-gradient(180deg, #57534e 0%, #292524 100%);
+      border-radius: 4px;
+      margin: -26px auto 14px auto;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.25);
+      position: relative;
+    }
+    .bistro-clip::after {
+      content: '';
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 28px;
+      height: 4px;
+      border-radius: 2px;
+      background: #a8a29e;
+    }
+
+    /* Schwebende Preis-Fähnchen auf der Leaflet Radar-Karte */
+    .price-flag-marker {
+      background: transparent;
+      border: none;
+    }
+    .price-flag-bubble {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #ea580c;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 4px 9px;
+      border-radius: 9999px;
+      box-shadow: 0 4px 12px rgba(234, 88, 12, 0.45);
+      border: 2px solid #ffffff;
+      white-space: nowrap;
+      transition: transform 0.15s ease;
+    }
+    .price-flag-bubble:hover {
+      transform: scale(1.08);
+      background: #c2410c;
+    }
+  </style>
+</head>
+<body class="bg-stone-50 text-stone-800 antialiased min-h-screen flex flex-col">
+
+  <!-- TOP BANNER: Regionale Skalierbarkeit & Live-Status -->
+  <div class="bg-stone-900 text-stone-200 text-xs py-2 px-4 border-b border-stone-800">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="dbStatusBadge" class="font-medium">Tageskarten für heute geladen</span>
+        <span class="hidden sm:inline text-stone-400">|</span>
+        <span id="currentDateDisplay" class="hidden sm:inline text-stone-300"></span>
+      </div>
+      <div class="flex items-center gap-3">
+        <label for="regionPresetSelect" class="text-stone-400 hidden md:inline">Region / PLZ-Gebiet:</label>
+        <select id="regionPresetSelect" aria-label="Region auswählen" class="bg-stone-800 text-stone-100 border border-stone-700 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500">
+          <option value="rhein-neckar-sued" selected>📍 69190 / 69168 / 68789 (15 km Umkreis)</option>
+          <option value="coming-soon" disabled>➕ Weitere Orte &amp; PLZ in Kürze verfügbar…</option>
+        </select>
+        <button id="openWirtModalBtnTop" type="button" class="text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2">
+          Für Gastronomen (Foto-Upload)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER MIT MARKE & ANSICHTS-UMSCHALTER -->
+  <header class="bg-white border-b border-stone-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <img src="./icon.svg" alt="Lunch-Helden Logo" class="w-12 h-12 rounded-2xl shadow-sm flex-shrink-0" />
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900">
+              Lunch-<span class="text-brand-600">Helden</span>
+            </h1>
+            <span class="bg-brand-100 text-brand-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Rhein-Neckar</span>
+          </div>
+          <p class="text-xs sm:text-sm text-stone-600 font-medium">
+            Dein Mittagstisch rund um Walldorf, Wiesloch &amp; St. Leon-Rot
+          </p>
+        </div>
+      </div>
+
+      <!-- 3-Wege Ansichts-Umschalter -->
+      <div class="flex items-center bg-stone-100 p-1 rounded-xl border border-stone-200 self-start md:self-auto" role="tablist" aria-label="Ansicht wechseln">
+        <button type="button" data-view="tiles" class="view-switch-btn flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-brand-600 shadow-sm">
+          <span>🍱</span>
+          <span>Kacheln</span>
+        </button>
+        <button type="button" data-view="bistro" class="view-switch-btn flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all text-stone-600 hover:text-stone-900">
+          <span>📋</span>
+          <span>Bistro-Zettel</span>
+        </button>
+        <button type="button" data-view="map" class="view-switch-btn flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all text-stone-600 hover:text-stone-900">
+          <span>🗺️</span>
+          <span>Radar-Karte</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- FILTER-LEISTE -->
+    <div class="bg-stone-50/90 border-t border-stone-200/80 px-4 py-3">
+      <div class="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <!-- Orts-Filter -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0" role="group" aria-label="Ort filtern">
+          <span class="text-xs font-bold uppercase tracking-wider text-stone-400 mr-1">Ort:</span>
+          <button type="button" data-city="Alle" class="city-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-stone-900 text-white shadow-sm transition">
+            Alle Orte
+          </button>
+          <button type="button" data-city="Walldorf" class="city-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-stone-400 transition">
+            Walldorf
+          </button>
+          <button type="button" data-city="Wiesloch" class="city-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-stone-400 transition">
+            Wiesloch
+          </button>
+          <button type="button" data-city="St. Leon-Rot" class="city-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-stone-400 transition">
+            St. Leon-Rot
+          </button>
+        </div>
+
+        <!-- Merkmal-Filter -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-stone-400 mr-1">Filter:</span>
+          <button type="button" data-feature="parking" class="feature-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-brand-500 transition">
+            <span>🅿️</span>
+            <span>Parkplatz</span>
+          </button>
+          <button type="button" data-feature="terrace" class="feature-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-brand-500 transition">
+            <span>☀️</span>
+            <span>Terrasse</span>
+          </button>
+          <button type="button" data-feature="quick" class="feature-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-brand-500 transition">
+            <span>⚡</span>
+            <span>Schnell-Lunch</span>
+          </button>
+          <button type="button" data-feature="veggie" class="feature-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-emerald-600 transition">
+            <span>🌱</span>
+            <span>Vegetarisch</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- HAUPTINHALT -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-8">
+
+    <!-- Ergebnis-Infozeile -->
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
+      <p id="resultsCounter" class="text-sm font-medium text-stone-600">
+        Lade aktuelle Mittagstisch-Angebote…
+      </p>
+      <button id="resetFiltersBtn" type="button" class="hidden text-xs font-semibold text-brand-600 hover:text-brand-700 underline">
+        Alle Filter zurücksetzen
+      </button>
+    </div>
+
+    <!-- ANSICHT 1: KACHELN (Moderne App-Karten) -->
+    <section id="viewTiles" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-label="Kachel-Ansicht"></section>
+
+    <!-- ANSICHT 2: BISTRO-ZETTEL (Klemmbrett / Klassische Serifenschrift) -->
+    <section id="viewBistro" class="hidden grid grid-cols-1 md:grid-cols-2 gap-8 pt-4" aria-label="Bistro-Zettel-Ansicht"></section>
+
+    <!-- ANSICHT 3: RADAR-KARTE (Interaktive OpenStreetMap / Leaflet) -->
+    <section id="viewMap" class="hidden" aria-label="Radar-Karten-Ansicht">
+      <div class="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2 text-xs sm:text-sm font-semibold text-stone-700">
+            <span>📡</span>
+            <span>Lunch-Radar: Klicke auf ein Preis-Fähnchen für das Tagesgericht &amp; WhatsApp-Einladung</span>
+          </div>
+          <span class="text-xs text-stone-500">Umkreis: Walldorf • Wiesloch • St. Leon-Rot</span>
+        </div>
+        <div id="radarMapContainer" class="w-full h-[540px] z-10"></div>
+      </div>
+    </section>
+
+    <!-- LEERZUSTAND BEI KEINEN TREFFERN -->
+    <div id="emptyStateBox" class="hidden bg-white rounded-2xl border border-stone-200 p-10 text-center my-6">
+      <div class="text-4xl mb-3">🍽️</div>
+      <h2 class="text-lg font-bold text-stone-900 mb-1">Keine passenden Mittagsangebote gefunden</h2>
+      <p class="text-sm text-stone-600 mb-4">Für diese Filterkombination gibt es heute leider keinen Treffer.</p>
+      <button id="emptyResetBtn" type="button" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 transition">
+        Alle Filter zurücksetzen
+      </button>
+    </div>
+
+    <!-- CALL-TO-ACTION BANNER FÜR GASTRONOMEN -->
+    <section class="mt-12 bg-gradient-to-r from-stone-900 via-stone-800 to-brand-900 rounded-2xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div>
+        <span class="inline-block bg-brand-500/20 border border-brand-400/40 text-brand-200 text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2">
+          Wirt-Modus • KI-Foto-Scanner
+        </span>
+        <h2 class="text-xl sm:text-2xl font-extrabold mb-1">
+          Du führst ein Lokal in Walldorf, Wiesloch oder St. Leon-Rot?
+        </h2>
+        <p class="text-sm text-stone-300 max-w-2xl">
+          Fotografiere einfach deine Kreidetafel oder gedruckte Wochenkarte mit dem Smartphone. Unsere KI erkennt alle Gerichte &amp; Preise automatisch in Sekunden!
+        </p>
+      </div>
+      <button id="openWirtModalBtnBanner" type="button" class="flex-shrink-0 inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm px-5 py-3.5 rounded-xl shadow-md transition">
+        <span>📸</span>
+        <span>Tageskarte per Foto aktualisieren</span>
+      </button>
+    </section>
+  </main>
+
+  <!-- FOOTER MIT IMPRESSUM & DATENSCHUTZ -->
+  <footer class="bg-white border-t border-stone-200 mt-12">
+    <div class="max-w-6xl mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-500">
+      <div>
+        <p class="font-bold text-stone-800 text-sm">Lunch-Helden — Dein regionaler Mittagstisch</p>
+        <p>Startregion: 69190 Walldorf • 69168 Wiesloch • 68789 St. Leon-Rot (modular erweiterbar)</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-4 font-medium">
+        <button type="button" id="openWirtModalBtnFooter" class="hover:text-brand-600 transition">Wirt-Login (PIN)</button>
+        <span>•</span>
+        <button type="button" data-legal="impressum" class="legal-modal-btn hover:text-stone-900 transition">Impressum</button>
+        <span>•</span>
+        <button type="button" data-legal="datenschutz" class="legal-modal-btn hover:text-stone-900 transition">Datenschutz</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- MODAL: FÜR GASTRONOMEN (KI-FOTO-SCANNER) -->
+  <div id="wirtModal" class="fixed inset-0 z-50 hidden bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="wirtModalTitle">
+    <div class="bg-white rounded-2xl max-w-lg w-full border border-stone-200 shadow-2xl overflow-hidden">
+      <div class="bg-stone-900 text-white px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📸</span>
+          <h3 id="wirtModalTitle" class="font-bold text-base sm:text-lg">Für Gastronomen: Tageskarte per Foto aktualisieren</h3>
+        </div>
+        <button id="closeWirtModalBtn" type="button" class="text-stone-400 hover:text-white text-xl leading-none font-bold" aria-label="Schließen">&times;</button>
+      </div>
+
+      <form id="wirtScanForm" class="p-6 space-y-4">
+        <p class="text-xs text-stone-600 bg-stone-100 p-3 rounded-xl border border-stone-200">
+          💡 <strong>Tipp:</strong> Du kannst dieses Formular auch direkt per QR-Code / Magic-Link öffnen (z. B. <code>?wirt=1&amp;pin=1011</code>).
+        </p>
+
+        <div>
+          <label for="wirtRestaurantSelect" class="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1">1. Dein Lokal auswählen</label>
+          <select id="wirtRestaurantSelect" required class="w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"></select>
+        </div>
+
+        <div>
+          <label for="wirtPinInput" class="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1">2. Wirt-PIN eingeben</label>
+          <input id="wirtPinInput" type="password" inputmode="numeric" required placeholder="4-stellige Wirt-PIN (Demo: z. B. 1011)" class="w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div>
+          <label for="wirtPhotoInput" class="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1">3. Foto der Tafel / Wochenkarte</label>
+          <input id="wirtPhotoInput" type="file" accept="image/*" capture="environment" required class="w-full text-sm text-stone-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100" />
+        </div>
+
+        <div id="wirtScanFeedback" class="hidden rounded-xl p-3 text-xs font-medium"></div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button id="cancelWirtModalBtn" type="button" class="px-4 py-2.5 rounded-xl border border-stone-300 text-stone-700 text-xs font-semibold hover:bg-stone-100">
+            Abbrechen
+          </button>
+          <button id="submitWirtScanBtn" type="submit" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-sm transition">
+            KI-Scan starten &amp; speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: IMPRESSUM & DATENSCHUTZ (PLATZHALTER) -->
+  <div id="legalModal" class="fixed inset-0 z-50 hidden bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="legalModalTitle">
+    <div class="bg-white rounded-2xl max-w-lg w-full border border-stone-200 shadow-2xl overflow-hidden">
+      <div class="bg-stone-900 text-white px-6 py-4 flex items-center justify-between">
+        <h3 id="legalModalTitle" class="font-bold text-base">Rechtliche Hinweise</h3>
+        <button id="closeLegalModalBtn" type="button" class="text-stone-400 hover:text-white text-xl leading-none font-bold" aria-label="Schließen">&times;</button>
+      </div>
+      <div id="legalModalContent" class="p-6 text-xs text-stone-600 space-y-3 leading-relaxed"></div>
+    </div>
+  </div>
+
+  <!-- HAUPTSKRIPT (Vanilla JS, Supabase Live + Fallback) -->
+  <script>
+    // =========================================================================
+    // 1. KONFIGURATION (Supabase Public URL & Publishable Anon Key)
+    // =========================================================================
+    const SUPABASE_URL = 'https://hskgtyticqtrsalcslmr.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_lo2m1iPIg7Dud_wdWY268Q_z-YxpJNx';
+
+    // =========================================================================
+    // 2. REALISTISCHE STARTDATEN (Fallback, falls DB noch leer oder offline)
+    // =========================================================================
+    const FALLBACK_RESTAURANTS = [
+      {
+        id: 1,
+        name: 'Metzgerei Back',
+        city: 'St. Leon-Rot',
+        postal_code: '68789',
+        address: 'Hauptstraße 102, 68789 St. Leon-Rot',
+        lat: 49.2638,
+        lng: 8.6012,
+        category: 'Metzgerei & Heiße Theke',
+        has_parking: true,
+        has_terrace: false,
+        is_quick_lunch: true,
+        opening_hours: 'Mo–Fr 11:00–14:00 Uhr',
+        website_url: 'https://www.metzgerei-back.de',
+        dishes: [
+          { id: 101, day: 'Heute', title: 'Hausgemachter Schweinebraten mit Spätzle und Bratensoße', price: 8.50, is_vegetarian: false },
+          { id: 102, day: 'Heute', title: 'Käsespätzle mit Röstzwiebeln und kleinem Beilagensalat', price: 7.90, is_vegetarian: true }
+        ]
+      },
+      {
+        id: 2,
+        name: 'Restaurant Tournedo',
+        city: 'Walldorf',
+        postal_code: '69190',
+        address: 'Schwetzinger Straße 95, 69190 Walldorf',
+        lat: 49.3065,
+        lng: 8.6415,
+        category: 'Steak & Gutbürgerlich',
+        has_parking: true,
+        has_terrace: true,
+        is_quick_lunch: false,
+        opening_hours: 'Mo–Fr 11:30–14:30 Uhr',
+        website_url: 'https://www.tournedo-walldorf.de',
+        dishes: [
+          { id: 201, day: 'Heute', title: 'Hähnchenbrustfilet vom Grill auf mediterranem Grillgemüse mit Rosmarinkartoffeln', price: 11.90, is_vegetarian: false },
+          { id: 202, day: 'Heute', title: 'Cremiges Steinpilz-Risotto mit gehobeltem Grana Padano und Rucola', price: 10.50, is_vegetarian: true }
+        ]
+      },
+      {
+        id: 3,
+        name: 'Kurpfalz-Café',
+        city: 'Wiesloch',
+        postal_code: '69168',
+        address: 'Hauptstraße 88, 69168 Wiesloch',
+        lat: 49.2946,
+        lng: 8.6983,
+        category: 'Café & Bistro',
+        has_parking: false,
+        has_terrace: true,
+        is_quick_lunch: true,
+        opening_hours: 'Mo–Sa 11:30–14:30 Uhr',
+        website_url: 'https://www.kurpfalz-cafe.de',
+        dishes: [
+          { id: 301, day: 'Heute', title: 'Hausgemachte Spinat-Feta-Quiche mit frischem Wildkräutersalat', price: 8.90, is_vegetarian: true },
+          { id: 302, day: 'Heute', title: 'Kurpfälzer Kartoffelsuppe mit Wiener Würstchen und Holzofenbrot', price: 7.80, is_vegetarian: false }
+        ]
+      },
+      {
+        id: 4,
+        name: 'Pizzeria Da Pino',
+        city: 'Walldorf',
+        postal_code: '69190',
+        address: 'Nußlocher Straße 14, 69190 Walldorf',
+        lat: 49.3021,
+        lng: 8.6468,
+        category: 'Italienisch',
+        has_parking: true,
+        has_terrace: true,
+        is_quick_lunch: true,
+        opening_hours: 'Di–So 11:30–14:30 Uhr',
+        website_url: 'https://www.dapino-walldorf.de',
+        dishes: [
+          { id: 401, day: 'Heute', title: 'Mittags-Pizza Capricciosa (28cm) aus dem Steinofen + kleiner gemischter Salat', price: 9.90, is_vegetarian: false },
+          { id: 402, day: 'Heute', title: 'Penne all’Arrabbiata mit frischen Kirschtomaten, Knoblauch und Basilikum', price: 8.90, is_vegetarian: true }
+        ]
+      },
+      {
+        id: 5,
+        name: 'Banana Leaf',
+        city: 'Walldorf',
+        postal_code: '69190',
+        address: 'Bahnhofstraße 22, 69190 Walldorf',
+        lat: 49.3048,
+        lng: 8.6384,
+        category: 'Asiatisch & Curry',
+        has_parking: true,
+        has_terrace: true,
+        is_quick_lunch: true,
+        opening_hours: 'Mo–Fr 11:30–14:30 Uhr',
+        website_url: 'https://www.bananaleaf-walldorf.de',
+        dishes: [
+          { id: 501, day: 'Heute', title: 'Rotes Thai-Curry mit knuspriger Ente, Bambus, Paprika und Jasminreis', price: 10.90, is_vegetarian: false },
+          { id: 502, day: 'Heute', title: 'Mango-Kokos-Curry mit gebratenem Tofu, Zuckerschoten und Duftreis', price: 9.50, is_vegetarian: true }
+        ]
+      },
+      {
+        id: 6,
+        name: 'Restaurant Pagoni im Tierpark',
+        city: 'Walldorf',
+        postal_code: '69190',
+        address: 'Schwetzinger Straße 99, 69190 Walldorf',
+        lat: 49.3092,
+        lng: 8.6345,
+        category: 'Griechisch & Mediterran',
+        has_parking: true,
+        has_terrace: true,
+        is_quick_lunch: false,
+        opening_hours: 'Di–So 11:30–14:30 Uhr',
+        website_url: 'https://www.pagoni-walldorf.de',
+        dishes: [
+          { id: 601, day: 'Heute', title: 'Gyros vom Drehspieß mit Tzatziki, Tomatenreis und Krautsalat', price: 11.50, is_vegetarian: false },
+          { id: 602, day: 'Heute', title: 'Gebackener Schafskäse aus dem Ofen mit Oliven, Peperoni und Pitabrot', price: 10.20, is_vegetarian: true }
+        ]
+      },
+      {
+        id: 7,
+        name: 'Alte Schuhfabrik',
+        city: 'Wiesloch',
+        postal_code: '69168',
+        address: 'Schwetzinger Straße 58, 69168 Wiesloch',
+        lat: 49.2968,
+        lng: 8.6865,
+        category: 'Deutsche Küche & Brasserie',
+        has_parking: true,
+        has_terrace: true,
+        is_quick_lunch: false,
+        opening_hours: 'Mo–Fr 11:30–14:00 Uhr',
+        website_url: 'https://www.alteschuhfabrik.de',
+        dishes: [
+          { id: 701, day: 'Heute', title: 'Geschmorte Rinderbäckchen in Spätburgundersoße mit Kartoffelstampf', price: 12.90, is_vegetarian: false },
+          { id: 702, day: 'Heute', title: 'Geröstete Kürbis-Gnocchi in Salbeibutter mit Walnüssen', price: 10.90, is_vegetarian: true }
+        ]
+      },
+      {
+        id: 8,
+        name: 'ACE Restaurant St. Leon-Rot',
+        city: 'St. Leon-Rot',
+        postal_code: '68789',
+        address: 'Opelstraße 24, 68789 St. Leon-Rot',
+        lat: 49.2542,
+        lng: 8.6248,
+        category: 'Business-Lunch & Bowl',
+        has_parking: true,
+        has_terrace: true,
+        is_quick_lunch: true,
+        opening_hours: 'Mo–Fr 11:30–14:00 Uhr',
+        website_url: 'https://www.ace-restaurant.de',
+        dishes: [
+          { id: 801, day: 'Heute', title: 'Teriyaki Salmon Bowl mit Edamame, Avocado, Gurke und Sesam-Reis', price: 11.80, is_vegetarian: false },
+          { id: 802, day: 'Heute', title: 'Superfood Falafel Bowl mit Hummus, Granatapfel, Süßkartoffel und Quinoa', price: 10.40, is_vegetarian: true }
+        ]
+      }
+    ];
+
+    // =========================================================================
+    // 3. APP-STATE
+    // =========================================================================
+    const state = {
+      restaurants: [],
+      activeView: 'tiles', // 'tiles' | 'bistro' | 'map'
+      selectedCity: 'Alle',
+      features: {
+        parking: false,
+        terrace: false,
+        quick: false,
+        veggie: false
+      },
+      mapInstance: null,
+      mapMarkersGroup: null
+    };
+
+    let supabaseClient = null;
+    try {
+      if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+    } catch (err) {
+      console.warn('Supabase-Initialisierung übersprungen, nutze lokale Startdaten:', err);
+    }
+
+    // =========================================================================
+    // 4. HILFSFUNKTIONEN
+    // =========================================================================
+    function formatPrice(val) {
+      const num = Number(val) || 0;
+      return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function buildWhatsAppShareUrl(restaurant, dish) {
+      const dishLine = dish
+        ? `👉 ${dish.title} (${formatPrice(dish.price)})`
+        : `👉 Aktuelle Tageskarte ansehen`;
+      const text = `Hey! Gehen wir heute zusammen zu *${restaurant.name}* (${restaurant.city}) zum Mittagessen? 🍽️\n${dishLine}\n📍 ${restaurant.address}\nGefunden auf Lunch-Helden: ${window.location.origin}${window.location.pathname}`;
+      return `https://wa.me/?text=${encodeURIComponent(text)}`;
+    }
+
+    function getFilteredRestaurants() {
+      return state.restaurants
+        .map((r) => {
+          const filteredDishes = state.features.veggie
+            ? (r.dishes || []).filter((d) => d.is_vegetarian)
+            : (r.dishes || []);
+          return { ...r, visibleDishes: filteredDishes };
+        })
+        .filter((r) => {
+          if (state.selectedCity !== 'Alle' && r.city !== state.selectedCity) return false;
+          if (state.features.parking && !r.has_parking) return false;
+          if (state.features.terrace && !r.has_terrace) return false;
+          if (state.features.quick && !r.is_quick_lunch) return false;
+          if (state.features.veggie && r.visibleDishes.length === 0) return false;
+          return true;
+        });
+    }
+
+    // =========================================================================
+    // 5. DATEN LADEN (Supabase Live + Automatischer Fallback)
+    // =========================================================================
+    async function loadRestaurantsData() {
+      const badge = document.getElementById('dbStatusBadge');
+      if (supabaseClient) {
+        try {
+          const { data: restRows, error: restErr } = await supabaseClient
+            .from('restaurants')
+            .select('id, name, city, postal_code, address, lat, lng, category, has_parking, has_terrace, is_quick_lunch, opening_hours, website_url, dishes(id, day, title, price, is_vegetarian)')
+            .order('id', { ascending: true });
+
+          if (!restErr && Array.isArray(restRows) && restRows.length > 0) {
+            state.restaurants = restRows.map((r) => ({
+              ...r,
+              dishes: Array.isArray(r.dishes) && r.dishes.length > 0
+                ? r.dishes
+                : (FALLBACK_RESTAURANTS.find((f) => f.id === r.id)?.dishes || [])
+            }));
+            badge.textContent = 'Live-Datenbank (Supabase) verbunden';
+            populateWirtDropdown();
+            renderAll();
+            checkUrlMagicLink();
+            return;
+          }
+        } catch (err) {
+          console.warn('Supabase Abfrage fehlgeschlagen, nutze lokale Startdaten:', err);
+        }
+      }
+
+      // Automatischer Fallback auf lokale Startdaten
+      state.restaurants = JSON.parse(JSON.stringify(FALLBACK_RESTAURANTS));
+      badge.textContent = 'Tageskarten aktiv (Regionale Startdaten)';
+      populateWirtDropdown();
+      renderAll();
+      checkUrlMagicLink();
+    }
+
+    // =========================================================================
+    // 6. RENDERING DER 3 ANSICHTEN
+    // =========================================================================
+    function renderAll() {
+      const filtered = getFilteredRestaurants();
+      const totalDishes = filtered.reduce((acc, r) => acc + r.visibleDishes.length, 0);
+
+      // Zähler & Reset-Button aktualisieren
+      const counterEl = document.getElementById('resultsCounter');
+      counterEl.textContent = `${filtered.length} ${filtered.length === 1 ? 'Lokal' : 'Lokale'} mit ${totalDishes} ${totalDishes === 1 ? 'Tagesgericht' : 'Tagesgerichten'} gefunden`;
+
+      const hasActiveFilters =
+        state.selectedCity !== 'Alle' ||
+        Object.values(state.features).some(Boolean);
+      document.getElementById('resetFiltersBtn').classList.toggle('hidden', !hasActiveFilters);
+
+      const emptyBox = document.getElementById('emptyStateBox');
+      emptyBox.classList.toggle('hidden', filtered.length > 0);
+
+      renderTilesView(filtered);
+      renderBistroView(filtered);
+      renderRadarMapView(filtered);
+    }
+
+    // --- ANSICHT 1: KACHELN ---
+    function renderTilesView(restaurants) {
+      const container = document.getElementById('viewTiles');
+      container.innerHTML = restaurants
+        .map((r) => {
+          const cheapestPrice = r.visibleDishes.length
+            ? Math.min(...r.visibleDishes.map((d) => Number(d.price)))
+            : null;
+          const primaryDish = r.visibleDishes[0] || null;
+          const waUrl = buildWhatsAppShareUrl(r, primaryDish);
+
+          const dishesHtml = r.visibleDishes
+            .map(
+              (d) => `
+              <li class="py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3 border-b border-stone-100 last:border-0">
+                <div class="text-sm text-stone-800 font-medium leading-snug">
+                  <span>${escapeHtml(d.title)}</span>
+                  ${
+                    d.is_vegetarian
+                      ? `<span class="inline-flex items-center gap-0.5 ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">🌱 Veggie</span>`
+                      : ''
+                  }
+                </div>
+                <span class="flex-shrink-0 bg-brand-50 text-brand-700 border border-brand-200 font-extrabold text-xs px-2.5 py-1 rounded-lg">
+                  ${formatPrice(d.price)}
+                </span>
+              </li>`
+            )
+            .join('');
+
+          return `
+          <article class="bg-white rounded-2xl border border-stone-200/90 shadow-xs hover:shadow-md transition flex flex-col justify-between overflow-hidden">
+            <div>
+              <!-- Karten-Kopf -->
+              <div class="p-5 border-b border-stone-100">
+                <div class="flex items-start justify-between gap-2 mb-1.5">
+                  <span class="inline-block text-[11px] font-bold uppercase tracking-wider text-brand-600">
+                    ${escapeHtml(r.category)} • ${escapeHtml(r.city)}
+                  </span>
+                  ${
+                    cheapestPrice !== null
+                      ? `<span class="bg-stone-900 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">ab ${formatPrice(cheapestPrice)}</span>`
+                      : ''
+                  }
+                </div>
+                <h2 class="text-lg font-extrabold text-stone-900 leading-tight mb-1">
+                  ${escapeHtml(r.name)}
+                </h2>
+                <p class="text-xs text-stone-500 flex items-center gap-1">
+                  <span>📍 ${escapeHtml(r.address)}</span>
+                </p>
+                <p class="text-xs text-stone-500 mt-0.5">
+                  🕒 ${escapeHtml(r.opening_hours)}
+                </p>
+
+                <!-- Ausstattungs-Badges -->
+                <div class="flex flex-wrap gap-1.5 mt-3">
+                  ${
+                    r.has_parking
+                      ? `<span class="text-[11px] font-medium bg-stone-100 text-stone-700 px-2 py-0.5 rounded-md">🅿️ Parkplatz</span>`
+                      : ''
+                  }
+                  ${
+                    r.has_terrace
+                      ? `<span class="text-[11px] font-medium bg-stone-100 text-stone-700 px-2 py-0.5 rounded-md">☀️ Terrasse</span>`
+                      : ''
+                  }
+                  ${
+                    r.is_quick_lunch
+                      ? `<span class="text-[11px] font-medium bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md">⚡ Schnell-Lunch</span>`
+                      : ''
+                  }
+                </div>
+              </div>
+
+              <!-- Gerichte-Liste -->
+              <div class="p-5">
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2">Heutige Tageskarte</h3>
+                <ul class="divide-y divide-stone-100">
+                  ${dishesHtml}
+                </ul>
+              </div>
+            </div>
+
+            <!-- Karten-Fuß: WhatsApp & Transparenter Quellenhinweis -->
+            <div class="px-5 py-3.5 bg-stone-50 border-t border-stone-200/70 flex flex-col gap-2">
+              <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-2xs transition">
+                <span>💬</span>
+                <span>Per WhatsApp verabreden</span>
+              </a>
+              <div class="flex items-center justify-between text-[11px] text-stone-500">
+                <span>Quelle: Website des Anbieters</span>
+                <a href="${escapeHtml(r.website_url)}" target="_blank" rel="noopener noreferrer" class="font-semibold text-brand-600 hover:underline">
+                  Originalkarte ↗
+                </a>
+              </div>
+            </div>
+          </article>`;
+        })
+        .join('');
+    }
+
+    // --- ANSICHT 2: BISTRO-ZETTEL ---
+    function renderBistroView(restaurants) {
+      const container = document.getElementById('viewBistro');
+      container.innerHTML = restaurants
+        .map((r) => {
+          const primaryDish = r.visibleDishes[0] || null;
+          const waUrl = buildWhatsAppShareUrl(r, primaryDish);
+
+          const dishesHtml = r.visibleDishes
+            .map(
+              (d) => `
+              <div class="py-3 border-b border-dashed border-stone-300 last:border-0">
+                <div class="flex items-baseline justify-between gap-4">
+                  <h4 class="font-serif text-base font-bold text-stone-900 leading-snug">
+                    ${escapeHtml(d.title)}
+                    ${
+                      d.is_vegetarian
+                        ? `<span class="font-sans text-[11px] font-bold text-emerald-700 ml-1">(vegetarisch 🌱)</span>`
+                        : ''
+                    }
+                  </h4>
+                  <span class="font-serif text-base font-bold text-brand-700 whitespace-nowrap">
+                    ${formatPrice(d.price)}
+                  </span>
+                </div>
+              </div>`
+            )
+            .join('');
+
+          return `
+          <article class="bistro-paper rounded-xl border border-stone-300 p-6 sm:p-8 flex flex-col justify-between relative">
+            <div>
+              <div class="bistro-clip" aria-hidden="true"></div>
+              <div class="text-center border-b-2 border-double border-stone-400 pb-4 mb-4">
+                <p class="text-[11px] uppercase tracking-widest text-stone-500 font-semibold">
+                  Mittagstisch • ${escapeHtml(r.city)}
+                </p>
+                <h2 class="font-serif text-2xl font-bold text-stone-900 mt-0.5">
+                  ${escapeHtml(r.name)}
+                </h2>
+                <p class="font-serif italic text-xs text-stone-600 mt-1">
+                  ${escapeHtml(r.category)} — ${escapeHtml(r.opening_hours)}
+                </p>
+              </div>
+
+              <div class="space-y-1 mb-6">
+                ${dishesHtml}
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-stone-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div class="text-[11px] text-stone-600">
+                <p>📍 ${escapeHtml(r.address)}</p>
+                <p class="mt-0.5">
+                  Quelle: <a href="${escapeHtml(r.website_url)}" target="_blank" rel="noopener noreferrer" class="underline hover:text-stone-900">Website des Anbieters</a>
+                </p>
+              </div>
+              <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-amber-100 text-xs font-semibold px-4 py-2.5 rounded-lg transition">
+                <span>💬</span>
+                <span>Per WhatsApp verabreden</span>
+              </a>
+            </div>
+          </article>`;
+        })
+        .join('');
+    }
+
+    // --- ANSICHT 3: RADAR-KARTE (Leaflet) ---
+    function renderRadarMapView(restaurants) {
+      if (state.activeView !== 'map') return;
+
+      const mapEl = document.getElementById('radarMapContainer');
+      if (!mapEl || typeof L === 'undefined') return;
+
+      if (!state.mapInstance) {
+        // Zentrum zwischen Walldorf, Wiesloch und St. Leon-Rot
+        state.mapInstance = L.map('radarMapContainer').setView([49.288, 8.648], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(state.mapInstance);
+        state.mapMarkersGroup = L.layerGroup().addTo(state.mapInstance);
+      }
+
+      setTimeout(() => {
+        state.mapInstance.invalidateSize();
+      }, 60);
+
+      state.mapMarkersGroup.clearLayers();
+
+      const bounds = [];
+      restaurants.forEach((r) => {
+        if (!r.lat || !r.lng) return;
+        const primaryDish = r.visibleDishes[0] || null;
+        const minPrice = r.visibleDishes.length
+          ? Math.min(...r.visibleDishes.map((d) => Number(d.price)))
+          : 0;
+        const waUrl = buildWhatsAppShareUrl(r, primaryDish);
+
+        const icon = L.divIcon({
+          className: 'price-flag-marker',
+          html: `<div class="price-flag-bubble"><span>🍽️</span><span>${escapeHtml(r.name.split(' ')[0])} • ${formatPrice(minPrice)}</span></div>`,
+          iconSize: [140, 32],
+          iconAnchor: [70, 16]
+        });
+
+        const popupDishes = r.visibleDishes
+          .map(
+            (d) =>
+              `<li style="margin-bottom:4px;"><strong>${escapeHtml(d.title)}</strong> — <span style="color:#ea580c;font-weight:700;">${formatPrice(d.price)}</span> ${
+                d.is_vegetarian ? '🌱' : ''
+              }</li>`
+          )
+          .join('');
+
+        const popupHtml = `
+          <div style="min-width:220px;font-family:Inter,sans-serif;font-size:12px;line-height:1.4;">
+            <div style="font-weight:800;font-size:14px;color:#1c1917;margin-bottom:2px;">${escapeHtml(r.name)}</div>
+            <div style="color:#57534e;margin-bottom:6px;">${escapeHtml(r.address)}</div>
+            <ul style="padding-left:14px;margin:6px 0 10px 0;">${popupDishes}</ul>
+            <a href="${waUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;background:#059669;color:#fff;text-decoration:none;font-weight:700;padding:6px 10px;border-radius:8px;margin-bottom:6px;">
+              💬 Per WhatsApp verabreden
+            </a>
+            <div style="font-size:11px;color:#78716c;display:flex;justify-content:space-between;">
+              <span>Quelle: Website des Anbieters</span>
+              <a href="${escapeHtml(r.website_url)}" target="_blank" rel="noopener noreferrer" style="color:#ea580c;font-weight:600;">Website ↗</a>
+            </div>
+          </div>
+        `;
+
+        const marker = L.marker([r.lat, r.lng], { icon }).bindPopup(popupHtml);
+        state.mapMarkersGroup.addLayer(marker);
+        bounds.push([r.lat, r.lng]);
+      });
+
+      if (bounds.length > 0) {
+        state.mapInstance.fitBounds(bounds, { padding: [45, 45], maxZoom: 14 });
+      }
+    }
+
+    // =========================================================================
+    // 7. INTERAKTIONEN: ANSICHTEN, FILTER & WIRT-MODUS
+    // =========================================================================
+    function setActiveView(viewName) {
+      state.activeView = viewName;
+
+      document.getElementById('viewTiles').classList.toggle('hidden', viewName !== 'tiles');
+      document.getElementById('viewBistro').classList.toggle('hidden', viewName !== 'bistro');
+      document.getElementById('viewMap').classList.toggle('hidden', viewName !== 'map');
+
+      document.querySelectorAll('.view-switch-btn').forEach((btn) => {
+        const isCurrent = btn.getAttribute('data-view') === viewName;
+        btn.className = isCurrent
+          ? 'view-switch-btn flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-brand-600 shadow-sm'
+          : 'view-switch-btn flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all text-stone-600 hover:text-stone-900';
+      });
+
+      if (viewName === 'map') {
+        renderRadarMapView(getFilteredRestaurants());
+      }
+    }
+
+    function populateWirtDropdown() {
+      const select = document.getElementById('wirtRestaurantSelect');
+      select.innerHTML = state.restaurants
+        .map((r) => `<option value="${r.id}">${escapeHtml(r.name)} (${escapeHtml(r.city)})</option>`)
+        .join('');
+    }
+
+    function openWirtModal(preselectId, prefillPin) {
+      const modal = document.getElementById('wirtModal');
+      modal.classList.remove('hidden');
+      if (preselectId) {
+        document.getElementById('wirtRestaurantSelect').value = String(preselectId);
+      }
+      if (prefillPin) {
+        document.getElementById('wirtPinInput').value = String(prefillPin);
+      }
+    }
+
+    function closeWirtModal() {
+      document.getElementById('wirtModal').classList.add('hidden');
+      document.getElementById('wirtScanFeedback').classList.add('hidden');
+    }
+
+    function checkUrlMagicLink() {
+      const params = new URLSearchParams(window.location.search);
+      const wirtId = params.get('wirt');
+      const pin = params.get('pin');
+      if (wirtId) {
+        openWirtModal(wirtId, pin || '');
+      }
+    }
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || '');
+          const base64 = result.includes(',') ? result.split(',')[1] : result;
+          resolve({ base64, mimeType: file.type || 'image/jpeg' });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Event-Listener initialisieren
+    document.addEventListener('DOMContentLoaded', () => {
+      // Aktuelles Datum im Top-Banner
+      const now = new Date();
+      document.getElementById('currentDateDisplay').textContent = now.toLocaleDateString('de-DE', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      });
+
+      // Ansichts-Umschalter
+      document.querySelectorAll('.view-switch-btn').forEach((btn) => {
+        btn.addEventListener('click', () => setActiveView(btn.getAttribute('data-view')));
+      });
+
+      // Orts-Filter
+      document.querySelectorAll('.city-filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.selectedCity = btn.getAttribute('data-city');
+          document.querySelectorAll('.city-filter-btn').forEach((b) => {
+            const active = b.getAttribute('data-city') === state.selectedCity;
+            b.className = active
+              ? 'city-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-stone-900 text-white shadow-sm transition'
+              : 'city-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-stone-400 transition';
+          });
+          renderAll();
+        });
+      });
+
+      // Merkmal-Filter
+      document.querySelectorAll('.feature-filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const feat = btn.getAttribute('data-feature');
+          state.features[feat] = !state.features[feat];
+          const active = state.features[feat];
+          btn.className = active
+            ? 'feature-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-brand-600 text-white border border-brand-600 shadow-xs transition'
+            : 'feature-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-brand-500 transition';
+          renderAll();
+        });
+      });
+
+      // Filter zurücksetzen
+      const resetAllFilters = () => {
+        state.selectedCity = 'Alle';
+        Object.keys(state.features).forEach((k) => (state.features[k] = false));
+        document.querySelectorAll('.city-filter-btn').forEach((b) => {
+          const active = b.getAttribute('data-city') === 'Alle';
+          b.className = active
+            ? 'city-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-stone-900 text-white shadow-sm transition'
+            : 'city-filter-btn px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-stone-400 transition';
+        });
+        document.querySelectorAll('.feature-filter-btn').forEach((b) => {
+          b.className =
+            'feature-filter-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-stone-700 border border-stone-300 hover:border-brand-500 transition';
+        });
+        renderAll();
+      };
+      document.getElementById('resetFiltersBtn').addEventListener('click', resetAllFilters);
+      document.getElementById('emptyResetBtn').addEventListener('click', resetAllFilters);
+
+      // Wirt-Modal Buttons
+      ['openWirtModalBtnTop', 'openWirtModalBtnBanner', 'openWirtModalBtnFooter'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('click', () => openWirtModal());
+      });
+      document.getElementById('closeWirtModalBtn').addEventListener('click', closeWirtModal);
+      document.getElementById('cancelWirtModalBtn').addEventListener('click', closeWirtModal);
+
+      // Wirt-Formular Submit (Ruft Supabase Edge Function `scan-menu` auf)
+      document.getElementById('wirtScanForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const feedback = document.getElementById('wirtScanFeedback');
+        const submitBtn = document.getElementById('submitWirtScanBtn');
+        const restaurantId = Number(document.getElementById('wirtRestaurantSelect').value);
+        const wirtPin = document.getElementById('wirtPinInput').value.trim();
+        const photoFile = document.getElementById('wirtPhotoInput').files[0];
+
+        if (!photoFile) return;
+
+        feedback.className = 'rounded-xl p-3 text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200';
+        feedback.textContent = '⏳ Foto wird analysiert (Gemini 2.5 Flash) und Tageskarte aktualisiert…';
+        feedback.classList.remove('hidden');
+        submitBtn.disabled = true;
+
+        try {
+          const { base64, mimeType } = await fileToBase64(photoFile);
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/scan-menu`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+              restaurant_id: restaurantId,
+              wirt_pin: wirtPin,
+              image_base64: base64,
+              mime_type: mimeType
+            })
+          });
+
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(result.error || `Edge Function Status ${response.status}`);
+          }
+
+          feedback.className = 'rounded-xl p-3 text-xs font-medium bg-emerald-50 text-emerald-900 border border-emerald-200';
+          feedback.textContent = `✅ Erfolgreich! ${result.dishes?.length || 0} Tagesgerichte wurden erkannt und live gespeichert.`;
+          await loadRestaurantsData();
+        } catch (err) {
+          feedback.className = 'rounded-xl p-3 text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200';
+          feedback.textContent = `ℹ️ Hinweis (${err.message}): Sobald die Supabase Edge Function "scan-menu" deployed ist, werden Fotos hier live per KI in die Datenbank übernommen.`;
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      // Impressum & Datenschutz Modal
+      document.querySelectorAll('.legal-modal-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const type = btn.getAttribute('data-legal');
+          const titleEl = document.getElementById('legalModalTitle');
+          const contentEl = document.getElementById('legalModalContent');
+          if (type === 'impressum') {
+            titleEl.textContent = 'Impressum (Platzhalter)';
+            contentEl.innerHTML = `
+              <p><strong>Angaben gemäß § 5 DDG:</strong></p>
+              <p>Lunch-Helden (Projekt-Prototyp)<br/>Region Walldorf / Wiesloch / St. Leon-Rot<br/>E-Mail: hallo@lunch-helden.de</p>
+              <p><strong>Quellenhinweis zu Speisekarten &amp; Preisen:</strong><br/>Alle angezeigten Fakten (Gerichtsbezeichnungen, Preise, Öffnungszeiten) stammen von den öffentlich zugänglichen Webseiten der jeweiligen Gastronomiebetriebe oder wurden durch die Gastronomen selbst per Foto-Upload bereitgestellt. Alle Angaben ohne Gewähr.</p>
+            `;
+          } else {
+            titleEl.textContent = 'Datenschutzerklärung (Platzhalter)';
+            contentEl.innerHTML = `
+              <p><strong>Datenschutz auf einen Blick:</strong></p>
+              <p>Lunch-Helden speichert keine personenbezogenen Tracking-Cookies. Für die Darstellung der interaktiven Karte werden Kartenkacheln von OpenStreetMap geladen. Die Datenbankabfrage der Tagesgerichte erfolgt über Supabase.</p>
+              <p>Beim Klick auf „Per WhatsApp verabreden“ wirst du erst nach deiner aktiven Bestätigung zu WhatsApp weitergeleitet.</p>
+            `;
+          }
+          document.getElementById('legalModal').classList.remove('hidden');
+        });
+      });
+      document.getElementById('closeLegalModalBtn').addEventListener('click', () => {
+        document.getElementById('legalModal').classList.add('hidden');
+      });
+
+      // Daten beim Start laden
+      loadRestaurantsData();
+    });
+  </script>
+</body>
+</html>

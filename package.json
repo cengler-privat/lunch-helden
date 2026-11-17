@@ -1,0 +1,20 @@
+{
+  "name": "lunch-helden",
+  "version": "1.0.0",
+  "description": "Lunch-Helden – Dein Mittagstisch rund um Walldorf, Wiesloch & St. Leon-Rot",
+  "type": "module",
+  "main": "scraper.js",
+  "scripts": {
+    "start": "npx serve . -l 3000",
+    "scrape": "node scraper.js"
+  },
+  "dependencies": {
+    "@google/genai": "latest",
+    "@supabase/supabase-js": "^2.45.0",
+    "axios": "^1.7.7",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "pdf-parse": "^1.1.1",
+    "robots-parser": "^3.0.1"
+  }
+}
