@@ -17,9 +17,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
-    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+    const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim().replace(/\/$/, "");
+    const supabaseServiceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+    const geminiApiKey = (Deno.env.get("GEMINI_API_KEY") ?? "").trim();
 
     if (!supabaseUrl || !supabaseServiceRoleKey || !geminiApiKey) {
       return new Response(
@@ -82,10 +82,13 @@ Deno.serve(async (req: Request) => {
     let lastError = "Keine Antwort von Gemini";
 
     for (const modelName of modelsToTry) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(geminiApiKey)}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
       const geminiResp = await fetch(geminiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": geminiApiKey,
+        },
         body: JSON.stringify({
           contents: [
             {
