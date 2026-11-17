@@ -58,11 +58,11 @@ CREATE POLICY "Public read access for dishes"
 -- 3. Start-Daten (Seed) für Walldorf, Wiesloch & St. Leon-Rot
 INSERT INTO public.restaurants (id, name, city, postal_code, address, lat, lng, category, has_parking, has_terrace, is_quick_lunch, opening_hours, website_url, wirt_pin) VALUES
   (1, 'Metzgerei Back', 'St. Leon-Rot', '68789', 'Hauptstraße 102, 68789 St. Leon-Rot', 49.2638, 8.6012, 'Metzgerei & Heiße Theke', true, false, true, 'Mo–Fr 11:00–14:00 Uhr', 'https://www.metzgerei-back.de', '1011'),
-  (2, 'Restaurant Tournedo', 'Walldorf', '69190', 'Schwetzinger Straße 95, 69190 Walldorf', 49.3065, 8.6415, 'Steak & Gutbürgerlich', true, true, false, 'Mo–Fr 11:30–14:30 Uhr', 'https://www.tournedo-walldorf.de', '2022'),
+  (2, 'Restaurant Tournedo', 'Walldorf', '69190', 'Schwetzinger Straße 95, 69190 Walldorf', 49.3065, 8.6415, 'Steak & Gutbürgerlich', true, true, false, 'Mo–Fr 11:30–14:30 Uhr', 'http://restaurant-tournedo.de', '2022'),
   (3, 'Kurpfalz-Café', 'Wiesloch', '69168', 'Hauptstraße 88, 69168 Wiesloch', 49.2946, 8.6983, 'Café & Bistro', false, true, true, 'Mo–Sa 11:30–14:30 Uhr', 'https://www.kurpfalz-cafe.de', '3033'),
-  (4, 'Pizzeria Da Pino', 'Walldorf', '69190', 'Nußlocher Straße 14, 69190 Walldorf', 49.3021, 8.6468, 'Italienisch', true, true, true, 'Di–So 11:30–14:30 Uhr', 'https://www.dapino-walldorf.de', '4044'),
-  (5, 'Banana Leaf', 'Walldorf', '69190', 'Bahnhofstraße 22, 69190 Walldorf', 49.3048, 8.6384, 'Asiatisch & Curry', true, true, true, 'Mo–Fr 11:30–14:30 Uhr', 'https://www.bananaleaf-walldorf.de', '5055'),
-  (6, 'Restaurant Pagoni im Tierpark', 'Walldorf', '69190', 'Schwetzinger Straße 99, 69190 Walldorf', 49.3092, 8.6345, 'Griechisch & Mediterran', true, true, false, 'Di–So 11:30–14:30 Uhr', 'https://www.pagoni-walldorf.de', '6066'),
+  (4, 'Pizzeria Da Pino', 'Walldorf', '69190', 'Nußlocher Straße 14, 69190 Walldorf', 49.3021, 8.6468, 'Italienisch', true, true, true, 'Di–So 11:30–14:30 Uhr', 'https://www.pizzeriadapino-walldorf.de', '4044'),
+  (5, 'Banana Leaf', 'Walldorf', '69190', 'Bahnhofstraße 22, 69190 Walldorf', 49.3048, 8.6384, 'Asiatisch & Curry', true, true, true, 'Mo–Fr 11:30–14:30 Uhr', 'https://bananaleaf-germany.de', '5055'),
+  (6, 'Restaurant Pagoni im Tierpark', 'Walldorf', '69190', 'Schwetzinger Straße 99, 69190 Walldorf', 49.3092, 8.6345, 'Griechisch & Mediterran', true, true, false, 'Di–So 11:30–14:30 Uhr', 'https://restaurant-pagoni-walldorfd.metro.rest/?lang=de', '6066'),
   (7, 'Alte Schuhfabrik', 'Wiesloch', '69168', 'Schwetzinger Straße 58, 69168 Wiesloch', 49.2968, 8.6865, 'Deutsche Küche & Brasserie', true, true, false, 'Mo–Fr 11:30–14:00 Uhr', 'https://www.alteschuhfabrik.de', '7077'),
   (8, 'ACE Restaurant St. Leon-Rot', 'St. Leon-Rot', '68789', 'Opelstraße 24, 68789 St. Leon-Rot', 49.2542, 8.6248, 'Business-Lunch & Bowl', true, true, true, 'Mo–Fr 11:30–14:00 Uhr', 'https://www.ace-restaurant.de', '8088')
 ON CONFLICT (id) DO UPDATE SET

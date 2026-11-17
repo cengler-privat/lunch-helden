@@ -17,7 +17,12 @@ import { GoogleGenAI, Type } from '@google/genai';
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://hskgtyticqtrsalcslmr.supabase.co').trim();
 const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
-const GEMINI_MODEL = (process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim();
+const GEMINI_MODELS = [
+  process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.8-flash',
+];
 
 const missingVars = [];
 if (!SUPABASE_SERVICE_ROLE_KEY) missingVars.push('SUPABASE_SERVICE_ROLE_KEY');
@@ -119,36 +124,43 @@ async function fetchMenuRawText(websiteUrl) {
 }
 
 /**
- * Extrahiert Tagesgerichte mithilfe von Gemini als strukturiertes JSON.
+ * Extrahiert Tagesgerichte mithilfe von Gemini als strukturiertes JSON (inkl. Modell-Fallback bei 503-Spikes).
  */
 async function extractDishesWithGemini(restaurantName, rawText) {
-  const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: `
+  let lastError = null;
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: `
       Du analysierst den öffentlichen Speisekarten-Text von "${restaurantName}".
       Extrahiere alle aktuellen Mittagsgerichte / Tagesgerichte als Liste von Fakten (keine werblichen Beschreibungen kopieren).
       Text:
       ${rawText}
     `,
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            day: { type: Type.STRING, description: 'Wochentag (z. B. Montag, Dienstag oder Heute)' },
-            title: { type: Type.STRING, description: 'Sachliche Bezeichnung des Tagesgerichts' },
-            price: { type: Type.NUMBER, description: 'Preis in Euro als Zahl' },
-            is_vegetarian: { type: Type.BOOLEAN, description: 'True falls vegetarisch' },
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                day: { type: Type.STRING, description: 'Wochentag (z. B. Montag, Dienstag oder Heute)' },
+                title: { type: Type.STRING, description: 'Sachliche Bezeichnung des Tagesgerichts' },
+                price: { type: Type.NUMBER, description: 'Preis in Euro als Zahl' },
+                is_vegetarian: { type: Type.BOOLEAN, description: 'True falls vegetarisch' },
+              },
+              required: ['day', 'title', 'price', 'is_vegetarian'],
+            },
           },
-          required: ['day', 'title', 'price', 'is_vegetarian'],
         },
-      },
-    },
-  });
-
-  return JSON.parse(response.text || '[]');
+      });
+      return JSON.parse(response.text || '[]');
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 
 async function runWeeklyScrape() {
