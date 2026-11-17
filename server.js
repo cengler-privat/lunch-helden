@@ -69,7 +69,7 @@ async function handleScanMenu(req, res) {
       return sendJson(res, 404, { error: 'Restaurant wurde nicht gefunden.' });
     }
 
-    if (String(restaurant.wirt_pin).trim() !== String(wirt_pin).trim()) {
+    if (String(restaurant.wirt_pin).trim().toUpperCase() !== String(wirt_pin).trim().toUpperCase()) {
       return sendJson(res, 401, { error: 'Ungültige Wirt-PIN. Bitte prüfe deine Zugangsdaten.' });
     }
 
@@ -194,5 +194,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`\n🚀 Lunch-Helden Lokal-Server läuft auf: http://localhost:${PORT}`);
   console.log(`📸 KI-Foto-Scanner (Wirt-Modus) aktiv unter: http://localhost:${PORT}/api/scan-menu`);
-  console.log(`🔑 Wirt-PINs zum Testen: Metzgerei Back = 1011, Tournedo = 2022, Kurpfalz-Café = 3033\n`);
+  console.log(`🔑 Wirt-PINs zum Testen: Metzgerei Back = B4K92, Tournedo = T7R48, Kurpfalz-Café = K3C85\n`);
 });

@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (String(restaurant.wirt_pin).trim() !== String(wirt_pin).trim()) {
+    if (String(restaurant.wirt_pin).trim().toUpperCase() !== String(wirt_pin).trim().toUpperCase()) {
       return new Response(
         JSON.stringify({ error: "Ungültige Wirt-PIN. Bitte prüfe deine Zugangsdaten." }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
