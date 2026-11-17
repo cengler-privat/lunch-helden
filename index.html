@@ -1333,7 +1333,13 @@
 
         try {
           const { base64, mimeType } = await fileToBase64(photoFile);
-          const response = await fetch(`${SUPABASE_URL}/functions/v1/scan-menu`, {
+          const isLocalhost =
+            window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          const endpointUrl = isLocalhost
+            ? './api/scan-menu'
+            : `${SUPABASE_URL}/functions/v1/scan-menu`;
+
+          const response = await fetch(endpointUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
